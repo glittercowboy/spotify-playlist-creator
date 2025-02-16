@@ -19,22 +19,24 @@
       padding: 30px;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      text-align: center;
     }
     h1 {
-      text-align: center;
       margin-bottom: 20px;
       color: #283593;
     }
     form {
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
       margin-bottom: 20px;
     }
     input[type="text"] {
-      flex: 1;
+      width: 80%;
       padding: 12px;
+      margin: 5px 0;
       border: 1px solid #ccc;
-      border-radius: 4px 0 0 4px;
+      border-radius: 4px;
       font-size: 16px;
     }
     button {
@@ -43,28 +45,13 @@
       background-color: #283593;
       color: #fff;
       font-size: 16px;
-      border-radius: 0 4px 4px 0;
+      border-radius: 4px;
       cursor: pointer;
       transition: background-color 0.3s;
+      margin-top: 10px;
     }
     button:hover {
       background-color: #1a237e;
-    }
-    #progress {
-      width: 100%;
-      background: #e0e0e0;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-bottom: 20px;
-    }
-    #progress-bar {
-      height: 24px;
-      background: linear-gradient(90deg, #283593, #1a237e);
-      width: 0%;
-      color: #fff;
-      text-align: center;
-      line-height: 24px;
-      transition: width 0.5s ease;
     }
     #status {
       background: #fafafa;
@@ -74,6 +61,7 @@
       max-height: 300px;
       overflow-y: auto;
       font-size: 14px;
+      text-align: left;
     }
     #status p {
       margin: 5px 0;
@@ -95,9 +83,6 @@
       <input type="text" name="label" placeholder="Enter Record Label" required>
       <button type="submit">Create Playlist</button>
     </form>
-    <div id="progress">
-      <div id="progress-bar">0%</div>
-    </div>
     <div id="status"></div>
   </div>
   
@@ -105,23 +90,16 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    const progressBar = document.getElementById('progress-bar');
     const statusDiv = document.getElementById('status');
   
     // Listen for progress events from the server
     socket.on('progress', function(data) {
-      // Append the status message
-      statusDiv.innerHTML += `<p>${data.message}</p>`;
+      // Prepend the new status message so the most recent is at the top
+      statusDiv.innerHTML = `<p>${data.message}</p>` + statusDiv.innerHTML;
   
-      // Update progress bar if percent provided
-      if (typeof data.percent === 'number') {
-        progressBar.style.width = data.percent + '%';
-        progressBar.textContent = data.percent + '%';
-      }
-  
-      // If a playlist URL is provided, display it
+      // If a playlist URL is provided, display it at the top
       if (data.playlist) {
-        statusDiv.innerHTML += `<p>Playlist created! <a href="${data.playlist}" target="_blank">View Playlist</a></p>`;
+        statusDiv.innerHTML = `<p>Playlist created! <a href="${data.playlist}" target="_blank">View Playlist</a></p>` + statusDiv.innerHTML;
       }
     });
   </script>

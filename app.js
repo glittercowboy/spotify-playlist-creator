@@ -28,7 +28,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI; // e.g., http://localhost:8888/ca
 const PORT = process.env.PORT || 8888;
 const SCOPES = 'playlist-modify-private';
 
-// In-memory storage for the current label name
+// Global variable for the current label name
 let currentLabel = '';
 
 // Helper: Sleep for a given number of milliseconds
@@ -102,9 +102,8 @@ async function searchAlbumsByLabel(label, token) {
       total = response.data.albums.total;
       albums = albums.concat(items);
       offset += limit;
-      // Update progress – after album search, update to 40%
       io.emit('progress', { message: `Fetched ${albums.length} of ${total} albums...`, percent: 40 });
-      await sleep(500); // slight delay to avoid rate limits
+      await sleep(500);
     } catch (error) {
       console.error('Error searching for albums:', error.response?.data || error.message);
       throw error;
@@ -132,11 +131,11 @@ async function getAlbumTracks(albumId, token) {
 // Create a new playlist in the user's account
 async function createPlaylist(userId, token, label) {
   const createPlaylistURL = `https://api.spotify.com/v1/users/${userId}/playlists`;
-  const playlistName = `Label: ${label}`;
+  const playlistName = `Label Playlist: ${label} (Chronological)`;
   const data = {
     name: playlistName,
     public: false,
-    description: `A chronological playlist of releases from "${label}".`
+    description: `A chronological playlist of songs from albums tagged with "${label}".`
   };
 
   try {
@@ -269,7 +268,7 @@ app.get('/callback', async (req, res) => {
     // Final update: processing complete
     io.emit('progress', { message: 'Processing complete. Check the main page for progress updates.', playlist: newPlaylist.external_urls.spotify, percent: 100 });
 
-    // Send a styled completion page as the response (so the popup looks nice too)
+    // Send a styled completion page as the response
     res.send(`
       <!DOCTYPE html>
       <html>
