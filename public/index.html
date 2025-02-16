@@ -2,59 +2,129 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Spotify Label Playlist Creator</title>
+  <title>TÂCHES' Spotify Label Playlist Creator</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
-    /* Simple styles for the form and progress bar */
+    /* Global Styles */
+    body {
+      background-color: #121212;
+      color: #E0E0E0;
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 3rem auto;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #BB86FC;
+    }
+    /* Form Styles */
+    form {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    input[type="text"] {
+      width: 60%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 4px 0 0 4px;
+      font-size: 1rem;
+      outline: none;
+    }
+    button {
+      padding: 0.75rem 1rem;
+      border: none;
+      background-color: #BB86FC;
+      color: #121212;
+      font-weight: bold;
+      font-size: 1rem;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #9a67ea;
+    }
+    /* Progress Bar Styles */
     #progress {
       width: 100%;
-      background-color: #ddd;
-      margin-top: 20px;
+      background-color: #333;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     }
     #progress-bar {
-      width: 0%;
       height: 30px;
-      background-color: #4CAF50;
+      background-color: #BB86FC;
+      width: 0%;
       text-align: center;
-      color: white;
+      line-height: 30px;
+      color: #121212;
+      transition: width 0.5s ease;
+    }
+    /* Status Messages */
+    #status {
+      background-color: #1E1E1E;
+      padding: 1rem;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    #status p {
+      margin: 0.5rem 0;
+      font-size: 0.9rem;
+    }
+    a {
+      color: #BB86FC;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
-  <h1>Spotify Label Playlist Creator</h1>
-  <form action="/start" method="POST">
-    <input type="text" name="label" placeholder="Enter Label Name" required>
-    <button type="submit">Create Playlist</button>
-  </form>
-
-  <div id="progress">
-    <div id="progress-bar">0%</div>
+  <div class="container">
+    <h1>TÂCHES' Spotify Label Playlist Creator</h1>
+    <form action="/start" method="POST">
+      <input type="text" name="label" placeholder="Enter Label Name" required>
+      <button type="submit">Create Playlist</button>
+    </form>
+    <div id="progress">
+      <div id="progress-bar">0%</div>
+    </div>
+    <div id="status"></div>
   </div>
-
-  <div id="status"></div>
-
-  <!-- Include socket.io client library -->
+  
+  <!-- Include Socket.io client library -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-
+    const progressBar = document.getElementById('progress-bar');
+    const statusDiv = document.getElementById('status');
+  
     // Listen for progress events from the server
     socket.on('progress', function(data) {
-      const statusDiv = document.getElementById('status');
+      // Append the status message
       statusDiv.innerHTML += `<p>${data.message}</p>`;
-      
-      // Update a simple progress bar (this is just illustrative)
-      // For example, if you want to increment by 20% for each update:
-      const progressBar = document.getElementById('progress-bar');
-      let currentWidth = parseInt(progressBar.style.width) || 0;
-      if(currentWidth < 100) {
-        currentWidth += 20;
-        if(currentWidth > 100) currentWidth = 100;
-        progressBar.style.width = currentWidth + '%';
-        progressBar.textContent = currentWidth + '%';
+  
+      // If a "percent" field is provided, update the progress bar accordingly
+      if (typeof data.percent === 'number') {
+        progressBar.style.width = data.percent + '%';
+        progressBar.textContent = data.percent + '%';
       }
-
-      // If a playlist URL is provided, show it
-      if(data.playlist) {
+  
+      // If a playlist URL is provided, display it
+      if (data.playlist) {
         statusDiv.innerHTML += `<p>Playlist created! <a href="${data.playlist}" target="_blank">View Playlist</a></p>`;
       }
     });

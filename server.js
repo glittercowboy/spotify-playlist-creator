@@ -102,7 +102,8 @@ async function searchAlbumsByLabel(label, token) {
       total = response.data.albums.total;
       albums = albums.concat(items);
       offset += limit;
-      io.emit('progress', { message: `Fetched ${albums.length} of ${total} albums...` });
+      // Update progress: here we update to 40% after album search completes.
+      io.emit('progress', { message: `Fetched ${albums.length} of ${total} albums...`, percent: 40 });
       await sleep(500); // slight delay to avoid rate limits
     } catch (error) {
       console.error('Error searching for albums:', error.response?.data || error.message);
@@ -166,7 +167,7 @@ async function addTracksToPlaylist(playlistId, trackURIs, token) {
           'Content-Type': 'application/json'
         },
       });
-      io.emit('progress', { message: `Added batch ${Math.floor(i / BATCH_SIZE) + 1} of tracks.` });
+      io.emit('progress', { message: `Added batch ${Math.floor(i / BATCH_SIZE) + 1} of tracks.`, percent: 90 });
       await sleep(300);
     } catch (error) {
       console.error('Error adding tracks to playlist:', error.response?.data || error.message);
@@ -210,19 +211,19 @@ app.get('/callback', async (req, res) => {
   }
 
   try {
-    io.emit('progress', { message: 'Received authorization code.' });
+    io.emit('progress', { message: 'Received authorization code.', percent: 10 });
 
     // Exchange code for access token
     const accessToken = await getAccessToken(code);
-    io.emit('progress', { message: 'Access token received.' });
+    io.emit('progress', { message: 'Access token received.', percent: 20 });
 
     // Get the current user's profile
     const userProfile = await getUserProfile(accessToken);
-    io.emit('progress', { message: `Logged in as ${userProfile.display_name} (${userProfile.id}).` });
+    io.emit('progress', { message: `Logged in as ${userProfile.display_name} (${userProfile.id}).`, percent: 30 });
     
     // Search for albums matching the label
     const albums = await searchAlbumsByLabel(currentLabel, accessToken);
-    io.emit('progress', { message: `Found ${albums.length} albums for label "${currentLabel}".` });
+    io.emit('progress', { message: `Found ${albums.length} albums for label "${currentLabel}".`, percent: 40 });
 
     // For each album, get its tracks and attach release date info
     let allTracks = [];
@@ -233,12 +234,12 @@ app.get('/callback', async (req, res) => {
         track.albumTrackNumber = track.track_number;
       });
       allTracks = allTracks.concat(albumTracks);
-      io.emit('progress', { message: `Processed album "${album.name}".` });
+      io.emit('progress', { message: `Processed album "${album.name}".`, percent: 45 });
       await sleep(200);
     }
 
     if (allTracks.length === 0) {
-      io.emit('progress', { message: `No tracks found for label "${currentLabel}".` });
+      io.emit('progress', { message: `No tracks found for label "${currentLabel}".`, percent: 50 });
       res.send('No tracks found.');
       return;
     }
@@ -252,20 +253,21 @@ app.get('/callback', async (req, res) => {
       }
       return dateA - dateB;
     });
-    io.emit('progress', { message: `Total tracks to add: ${allTracks.length}.` });
+    io.emit('progress', { message: `Total tracks to add: ${allTracks.length}.`, percent: 65 });
 
     // Extract track URIs
     const trackURIs = allTracks.map(track => track.uri);
 
     // Create a new playlist in the user's account
     const newPlaylist = await createPlaylist(userProfile.id, accessToken, currentLabel);
-    io.emit('progress', { message: `Created playlist "${newPlaylist.name}".` });
-    io.emit('progress', { message: 'Adding tracks to playlist...' });
+    io.emit('progress', { message: `Created playlist "${newPlaylist.name}".`, percent: 80 });
 
     // Add tracks to the new playlist in batches
     await addTracksToPlaylist(newPlaylist.id, trackURIs, accessToken);
-    io.emit('progress', { message: 'All tracks added to the playlist successfully.' });
-    io.emit('progress', { message: 'Playlist creation complete!', playlist: newPlaylist.external_urls.spotify });
+    io.emit('progress', { message: 'All tracks added to the playlist successfully.', percent: 90 });
+
+    // Final update: processing complete with playlist URL
+    io.emit('progress', { message: 'Processing complete. You can close this window and check the main page for progress updates.', playlist: newPlaylist.external_urls.spotify, percent: 100 });
 
     // Inform the user in the callback window
     res.send('<p>Processing complete. You can close this window and check the main page for progress updates.</p>');
