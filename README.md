@@ -31,7 +31,11 @@ npm install
 ```bash
 npm start
 ```
-6. 
+6. Open `http://localhost:8888` in your browser
+
+7. Note: You MUST use the exact label name as it appears on a release on Spotify.
+
+![App Screenshot](/screenshot.png)
 
 ## Features
 - Create chronological playlists by record label
