@@ -31,10 +31,10 @@ npm install
 ```bash
 npm start
 ```
+6. 
 
 ## Features
 - Create chronological playlists by record label
-- Optional tempo filtering
 - Real-time progress tracking
 
 ## Contributing
