@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spotify Label Playlist Creator</title>
+  <style>
+    /* Simple styles for the form and progress bar */
+    #progress {
+      width: 100%;
+      background-color: #ddd;
+      margin-top: 20px;
+    }
+    #progress-bar {
+      width: 0%;
+      height: 30px;
+      background-color: #4CAF50;
+      text-align: center;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Spotify Label Playlist Creator</h1>
+  <form action="/start" method="POST">
+    <input type="text" name="label" placeholder="Enter Label Name" required>
+    <button type="submit">Create Playlist</button>
+  </form>
+
+  <div id="progress">
+    <div id="progress-bar">0%</div>
+  </div>
+
+  <div id="status"></div>
+
+  <!-- Include socket.io client library -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Listen for progress events from the server
+    socket.on('progress', function(data) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.innerHTML += `<p>${data.message}</p>`;
+      
+      // Update a simple progress bar (this is just illustrative)
+      // For example, if you want to increment by 20% for each update:
+      const progressBar = document.getElementById('progress-bar');
+      let currentWidth = parseInt(progressBar.style.width) || 0;
+      if(currentWidth < 100) {
+        currentWidth += 20;
+        if(currentWidth > 100) currentWidth = 100;
+        progressBar.style.width = currentWidth + '%';
+        progressBar.textContent = currentWidth + '%';
+      }
+
+      // If a playlist URL is provided, show it
+      if(data.playlist) {
+        statusDiv.innerHTML += `<p>Playlist created! <a href="${data.playlist}" target="_blank">View Playlist</a></p>`;
+      }
+    });
+  </script>
+</body>
+</html>

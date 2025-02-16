@@ -171,11 +171,11 @@ async function getAlbumTracks(albumId, token) {
 // ------------------------
 async function createPlaylist(userId, token, label) {
   const createPlaylistURL = `https://api.spotify.com/v1/users/${userId}/playlists`;
-  const playlistName = `Label Playlist: ${label} (Chronological)`;
+  const playlistName = `${label} (Chronological)`;
   const data = {
     name: playlistName,
     public: false, // Create a private playlist
-    description: `A chronological playlist of songs from albums tagged with "${label}".`
+    description: `A chronological playlist of releases from ${label}.`
   };
 
   try {
