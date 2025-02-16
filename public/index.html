@@ -2,90 +2,86 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>TÂCHES' Spotify Label Playlist Creator</title>
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Spotify Playlist Creator</title>
+  <!-- Google Font: Montserrat -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
-    /* Global Styles */
     body {
-      background-color: #121212;
-      color: #E0E0E0;
-      font-family: 'Roboto', sans-serif;
+      background-color: #f4f4f4;
       margin: 0;
-      padding: 0;
+      font-family: 'Montserrat', sans-serif;
+      color: #333;
     }
     .container {
-      max-width: 800px;
-      margin: 3rem auto;
-      padding: 2rem;
+      max-width: 600px;
+      margin: 50px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
     h1 {
       text-align: center;
-      margin-bottom: 2rem;
-      color: #BB86FC;
+      margin-bottom: 20px;
+      color: #283593;
     }
-    /* Form Styles */
     form {
       display: flex;
       justify-content: center;
-      margin-bottom: 2rem;
+      margin-bottom: 20px;
     }
     input[type="text"] {
-      width: 60%;
-      padding: 0.75rem;
-      border: none;
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ccc;
       border-radius: 4px 0 0 4px;
-      font-size: 1rem;
-      outline: none;
+      font-size: 16px;
     }
     button {
-      padding: 0.75rem 1rem;
+      padding: 12px 20px;
       border: none;
-      background-color: #BB86FC;
-      color: #121212;
-      font-weight: bold;
-      font-size: 1rem;
+      background-color: #283593;
+      color: #fff;
+      font-size: 16px;
       border-radius: 0 4px 4px 0;
       cursor: pointer;
       transition: background-color 0.3s;
     }
     button:hover {
-      background-color: #9a67ea;
+      background-color: #1a237e;
     }
-    /* Progress Bar Styles */
     #progress {
       width: 100%;
-      background-color: #333;
+      background: #e0e0e0;
       border-radius: 4px;
       overflow: hidden;
-      margin-bottom: 1rem;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      margin-bottom: 20px;
     }
     #progress-bar {
-      height: 30px;
-      background-color: #BB86FC;
+      height: 24px;
+      background: linear-gradient(90deg, #283593, #1a237e);
       width: 0%;
+      color: #fff;
       text-align: center;
-      line-height: 30px;
-      color: #121212;
+      line-height: 24px;
       transition: width 0.5s ease;
     }
-    /* Status Messages */
     #status {
-      background-color: #1E1E1E;
-      padding: 1rem;
+      background: #fafafa;
+      padding: 15px;
+      border: 1px solid #ddd;
       border-radius: 4px;
       max-height: 300px;
       overflow-y: auto;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      font-size: 14px;
     }
     #status p {
-      margin: 0.5rem 0;
-      font-size: 0.9rem;
+      margin: 5px 0;
     }
     a {
-      color: #BB86FC;
+      color: #283593;
       text-decoration: none;
+      font-weight: 600;
     }
     a:hover {
       text-decoration: underline;
@@ -94,9 +90,9 @@
 </head>
 <body>
   <div class="container">
-    <h1>TÂCHES' Spotify Label Playlist Creator</h1>
+    <h1>Spotify Playlist Creator</h1>
     <form action="/start" method="POST">
-      <input type="text" name="label" placeholder="Enter Label Name" required>
+      <input type="text" name="label" placeholder="Enter Record Label" required>
       <button type="submit">Create Playlist</button>
     </form>
     <div id="progress">
@@ -117,7 +113,7 @@
       // Append the status message
       statusDiv.innerHTML += `<p>${data.message}</p>`;
   
-      // If a "percent" field is provided, update the progress bar accordingly
+      // Update progress bar if percent provided
       if (typeof data.percent === 'number') {
         progressBar.style.width = data.percent + '%';
         progressBar.textContent = data.percent + '%';

@@ -1,73 +1,46 @@
-/*
- * app.js
- *
- * This application:
- * 1. Reads a record label name from the command line.
- * 2. Starts an Express server to handle Spotify’s OAuth callback.
- * 3. Opens your browser for Spotify authentication.
- * 4. Exchanges the authorization code for an access token.
- * 5. Searches for albums using a query like: label:"Label Name" and paginates through all results.
- * 6. Retrieves all tracks from those albums, waiting between requests to avoid rate limits.
- * 7. Sorts all tracks in chronological order (by album release date and track number).
- * 8. Creates a new playlist in your Spotify account.
- * 9. Adds the sorted tracks to that playlist.
- * 10. Closes the Express server once processing is complete.
- *
- * Usage:
- *   node app.js "Label Name"
- */
+// server.js
 
-// ------------------------
-// Load Environment Variables
-// ------------------------
+// Load environment variables from .env file
 require('dotenv').config();
 
-// ------------------------
 // Required Libraries
-// ------------------------
 const express = require('express');
+const http = require('http');
+const socketIO = require('socket.io');
 const axios = require('axios');
-// We'll use dynamic import for open since it is an ES module
 const querystring = require('querystring');
 
-// ------------------------
-// Helper: Sleep Function to Wait a Specified Number of Milliseconds
-// ------------------------
+// Create Express app, HTTP server, and attach Socket.io
+const app = express();
+const server = http.createServer(app);
+const io = socketIO(server);
+
+// Middleware: Parse URL-encoded bodies (for form submissions)
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from the "public" folder (for index.html, CSS, etc.)
+app.use(express.static('public'));
+
+// Configuration from environment variables
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI; // e.g., http://localhost:8888/callback
+const PORT = process.env.PORT || 8888;
+const SCOPES = 'playlist-modify-private';
+
+// In-memory storage for the current label name
+let currentLabel = '';
+
+// Helper: Sleep for a given number of milliseconds
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ------------------------
-// Configuration Section (using environment variables)
-// ------------------------
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = process.env.REDIRECT_URI;  // e.g., http://localhost:8888/callback
-const PORT = process.env.PORT || 8888;
-const SCOPES = 'playlist-modify-private';
+// --------------------
+// Real Spotify API Call Functions
+// --------------------
 
-// ------------------------
-// Read the Label Name from the Command Line
-// ------------------------
-const labelName = process.argv[2];
-if (!labelName) {
-  console.error('Error: Please provide a label name as a command-line argument.');
-  console.error('Usage: node app.js "Label Name"');
-  process.exit(1);
-}
-console.log(`Searching for albums with label: "${labelName}"`);
-
-// ------------------------
-// Express App Setup
-// ------------------------
-const app = express();
-
-// Global variable to store the access token once received.
-let accessToken = '';
-
-// ------------------------
-// Helper Function: Get User Profile
-// ------------------------
+// Get the current user’s profile
 async function getUserProfile(token) {
   try {
     const response = await axios.get('https://api.spotify.com/v1/me', {
@@ -75,14 +48,12 @@ async function getUserProfile(token) {
     });
     return response.data;
   } catch (error) {
-    console.error('Error fetching user profile:', error.response ? error.response.data : error.message);
+    console.error('Error fetching user profile:', error.response?.data || error.message);
     throw error;
   }
 }
 
-// ------------------------
-// Helper Function: Exchange Authorization Code for Access Token
-// ------------------------
+// Exchange authorization code for access token
 async function getAccessToken(code) {
   const tokenURL = 'https://accounts.spotify.com/api/token';
   const data = querystring.stringify({
@@ -101,25 +72,20 @@ async function getAccessToken(code) {
     });
     return response.data.access_token;
   } catch (error) {
-    console.error('Error obtaining access token:', error.response ? error.response.data : error.message);
+    console.error('Error obtaining access token:', error.response?.data || error.message);
     throw error;
   }
 }
 
-// ------------------------
-// Helper Function: Search for Albums by Label with Pagination
-// ------------------------
+// Search for albums by label (with pagination)
 async function searchAlbumsByLabel(label, token) {
   const searchURL = 'https://api.spotify.com/v1/search';
-  // Query string formatted to search for a label
   const query = `label:"${label}"`;
-
   let albums = [];
-  const limit = 50; // Maximum allowed per Spotify's search endpoint
+  const limit = 50;
   let offset = 0;
   let total = 0;
 
-  // Fetch pages until we've retrieved all albums
   do {
     try {
       const response = await axios.get(searchURL, {
@@ -136,12 +102,11 @@ async function searchAlbumsByLabel(label, token) {
       total = response.data.albums.total;
       albums = albums.concat(items);
       offset += limit;
-
-      console.log(`Fetched ${albums.length} of ${total} albums so far...`);
-      // Wait a short while before the next request to help avoid rate limits.
-      await sleep(500);
+      // Update progress – after album search, update to 40%
+      io.emit('progress', { message: `Fetched ${albums.length} of ${total} albums...`, percent: 40 });
+      await sleep(500); // slight delay to avoid rate limits
     } catch (error) {
-      console.error('Error searching for albums:', error.response ? error.response.data : error.message);
+      console.error('Error searching for albums:', error.response?.data || error.message);
       throw error;
     }
   } while (offset < total);
@@ -149,33 +114,29 @@ async function searchAlbumsByLabel(label, token) {
   return albums;
 }
 
-// ------------------------
-// Helper Function: Get Tracks from an Album
-// ------------------------
+// Get tracks from a given album
 async function getAlbumTracks(albumId, token) {
   const albumTracksURL = `https://api.spotify.com/v1/albums/${albumId}/tracks`;
   try {
     const response = await axios.get(albumTracksURL, {
       headers: { 'Authorization': `Bearer ${token}` },
-      params: { market: 'US', limit: 50 } // Most albums have fewer than 50 tracks.
+      params: { market: 'US', limit: 50 }
     });
     return response.data.items;
   } catch (error) {
-    console.error(`Error fetching tracks for album ${albumId}:`, error.response ? error.response.data : error.message);
+    console.error(`Error fetching tracks for album ${albumId}:`, error.response?.data || error.message);
     throw error;
   }
 }
 
-// ------------------------
-// Helper Function: Create a New Playlist
-// ------------------------
+// Create a new playlist in the user's account
 async function createPlaylist(userId, token, label) {
   const createPlaylistURL = `https://api.spotify.com/v1/users/${userId}/playlists`;
-  const playlistName = `${label} (Chronological)`;
+  const playlistName = `Label: ${label}`;
   const data = {
     name: playlistName,
-    public: false, // Create a private playlist
-    description: `A chronological playlist of releases from ${label}.`
+    public: false,
+    description: `A chronological playlist of releases from "${label}".`
   };
 
   try {
@@ -187,17 +148,15 @@ async function createPlaylist(userId, token, label) {
     });
     return response.data;
   } catch (error) {
-    console.error('Error creating playlist:', error.response ? error.response.data : error.message);
+    console.error('Error creating playlist:', error.response?.data || error.message);
     throw error;
   }
 }
 
-// ------------------------
-// Helper Function: Add Tracks to a Playlist (Batched if needed)
-// ------------------------
+// Add tracks to a playlist in batches (max 100 per request)
 async function addTracksToPlaylist(playlistId, trackURIs, token) {
   const addTracksURL = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-  const BATCH_SIZE = 100; // Spotify's limit per request
+  const BATCH_SIZE = 100;
 
   for (let i = 0; i < trackURIs.length; i += BATCH_SIZE) {
     const batch = trackURIs.slice(i, i + BATCH_SIZE);
@@ -208,20 +167,42 @@ async function addTracksToPlaylist(playlistId, trackURIs, token) {
           'Content-Type': 'application/json'
         },
       });
-      console.log(`Added batch ${Math.floor(i / BATCH_SIZE) + 1} of tracks to playlist.`);
-      // Optional: Wait a moment between batch additions if needed
+      io.emit('progress', { message: `Added batch ${Math.floor(i / BATCH_SIZE) + 1} of tracks.`, percent: 90 });
       await sleep(300);
     } catch (error) {
-      console.error('Error adding tracks to playlist:', error.response ? error.response.data : error.message);
+      console.error('Error adding tracks to playlist:', error.response?.data || error.message);
       throw error;
     }
   }
 }
 
-// ------------------------
-// Express Route: /callback
-// Handles Spotify's OAuth callback
-// ------------------------
+// --------------------
+// Express Routes
+// --------------------
+
+// Serve the main page with the search form
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
+
+// Handle form submission: capture the label and start the OAuth flow
+app.post('/start', (req, res) => {
+  currentLabel = req.body.label;
+  console.log(`Label received: ${currentLabel}`);
+
+  // Build Spotify's authorization URL
+  const authURL = 'https://accounts.spotify.com/authorize?' + querystring.stringify({
+    response_type: 'code',
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    redirect_uri: REDIRECT_URI,
+    state: 'some-random-state'
+  });
+  // Redirect the user to Spotify for authentication
+  res.redirect(authURL);
+});
+
+// OAuth callback route: process the authorization code and create the playlist
 app.get('/callback', async (req, res) => {
   const code = req.query.code;
   if (!code) {
@@ -230,39 +211,40 @@ app.get('/callback', async (req, res) => {
   }
 
   try {
-    // Exchange the authorization code for an access token.
-    accessToken = await getAccessToken(code);
-    console.log(`Access token received: ${accessToken}`);
+    io.emit('progress', { message: 'Received authorization code.', percent: 10 });
 
-    // 1. Get the current user's profile to retrieve the userId.
+    // Exchange code for access token
+    const accessToken = await getAccessToken(code);
+    io.emit('progress', { message: 'Access token received.', percent: 20 });
+
+    // Get the current user's profile
     const userProfile = await getUserProfile(accessToken);
-    const userId = userProfile.id;
-    console.log(`Logged in as: ${userProfile.display_name} (ID: ${userId})`);
+    io.emit('progress', { message: `Logged in as ${userProfile.display_name} (${userProfile.id}).`, percent: 30 });
+    
+    // Search for albums matching the label
+    const albums = await searchAlbumsByLabel(currentLabel, accessToken);
+    io.emit('progress', { message: `Found ${albums.length} albums for label "${currentLabel}".`, percent: 40 });
 
-    // 2. Search for albums using the label query with pagination.
-    const albums = await searchAlbumsByLabel(labelName, accessToken);
-    console.log(`Total albums found for label "${labelName}": ${albums.length}`);
-
-    // 3. For each album, fetch its tracks and attach album release date info.
+    // For each album, get its tracks and attach release date info
     let allTracks = [];
     for (const album of albums) {
       const albumTracks = await getAlbumTracks(album.id, accessToken);
-      // Attach album release date and track number for sorting.
       albumTracks.forEach(track => {
         track.albumReleaseDate = album.release_date;
         track.albumTrackNumber = track.track_number;
       });
       allTracks = allTracks.concat(albumTracks);
-      // Wait a short moment between album track requests.
+      io.emit('progress', { message: `Processed album "${album.name}".`, percent: 45 });
       await sleep(200);
     }
 
     if (allTracks.length === 0) {
-      res.send(`No tracks found for label "${labelName}".`);
+      io.emit('progress', { message: `No tracks found for label "${currentLabel}".`, percent: 50 });
+      res.send('No tracks found.');
       return;
     }
 
-    // 4. Sort all tracks in chronological order (by album release date, then track number).
+    // Sort all tracks in chronological order (by album release date then track number)
     allTracks.sort((a, b) => {
       const dateA = new Date(a.albumReleaseDate);
       const dateB = new Date(b.albumReleaseDate);
@@ -271,60 +253,82 @@ app.get('/callback', async (req, res) => {
       }
       return dateA - dateB;
     });
+    io.emit('progress', { message: `Total tracks to add: ${allTracks.length}.`, percent: 65 });
 
-    // 5. Extract track URIs.
+    // Extract track URIs
     const trackURIs = allTracks.map(track => track.uri);
-    console.log(`Total tracks to add: ${trackURIs.length}`);
 
-    // 6. Create a new playlist in your account.
-    const newPlaylist = await createPlaylist(userId, accessToken, labelName);
-    console.log(`Created playlist "${newPlaylist.name}" with ID: ${newPlaylist.id}`);
-    console.log(`Playlist URL: ${newPlaylist.external_urls.spotify}`);
+    // Create a new playlist in the user's account
+    const newPlaylist = await createPlaylist(userProfile.id, accessToken, currentLabel);
+    io.emit('progress', { message: `Created playlist "${newPlaylist.name}".`, percent: 80 });
 
-    // 7. Add the sorted tracks to the new playlist.
+    // Add tracks to the new playlist in batches
     await addTracksToPlaylist(newPlaylist.id, trackURIs, accessToken);
-    console.log('All tracks added to the playlist successfully.');
+    io.emit('progress', { message: 'All tracks added to the playlist successfully.', percent: 90 });
 
-    // Notify the browser of completion.
-    res.send(`Playlist created! Check your terminal for details. You can view your new playlist <a href="${newPlaylist.external_urls.spotify}" target="_blank">here</a>.`);
+    // Final update: processing complete
+    io.emit('progress', { message: 'Processing complete. Check the main page for progress updates.', playlist: newPlaylist.external_urls.spotify, percent: 100 });
 
-    // Close the server after a short delay to allow the response to send.
-    setTimeout(() => {
-      console.log('Closing server...');
-      server.close(() => {
-        console.log('Server closed.');
-        process.exit(0);
-      });
-    }, 1000);
+    // Send a styled completion page as the response (so the popup looks nice too)
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Processing Complete</title>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+        <style>
+          body {
+            background-color: #f4f4f4;
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+          }
+          .message-box {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+          }
+          h2 {
+            color: #283593;
+          }
+          p {
+            margin-top: 20px;
+            font-size: 16px;
+          }
+          a {
+            color: #283593;
+            text-decoration: none;
+            font-weight: 600;
+          }
+          a:hover {
+            text-decoration: underline;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="message-box">
+          <h2>Processing Complete</h2>
+          <p>You can now close this window and check the main page for progress updates.</p>
+        </div>
+      </body>
+      </html>
+    `);
   } catch (error) {
-    console.error('An error occurred during processing:', error.message);
-    res.send('Error during processing. Check your terminal for details.');
+    console.error('Error during processing:', error.message);
+    res.send('Error during processing. Check the server logs for details.');
   }
 });
 
-// ------------------------
-// Start the Express Server & Initiate OAuth Flow
-// ------------------------
-const server = app.listen(PORT, () => {
+// --------------------
+// Start the Server
+// --------------------
+server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-
-  // Build Spotify's authorization URL with required parameters.
-  const authURL = 'https://accounts.spotify.com/authorize?' + querystring.stringify({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    redirect_uri: REDIRECT_URI,
-    state: 'some-random-state', // Optionally generate a random state string for extra security.
-  });
-
-  console.log('Opening browser for Spotify authentication...');
-  // Use dynamic import for the open module since it's an ES module.
-  import('open')
-    .then(openModule => {
-      // openModule.default is the function to call.
-      openModule.default(authURL);
-    })
-    .catch(error => {
-      console.error('Error loading open module:', error);
-    });
 });
