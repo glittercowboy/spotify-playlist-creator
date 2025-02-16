@@ -33,9 +33,15 @@ npm start
 ```
 6. Open `http://localhost:8888` in your browser
 
-7. Note: You MUST use the exact label name as it appears on a release on Spotify.
+7. Search for the exact label name as it appears on a release on Spotify.
+
+For example (as the following photo demonstrates) - search for "Crosstown Rebels". You do not need to put the year as that's just when the release came out.
+
+Some labels use a different name for the release, so be sure to look up the correct label name on Spotify. It might "XYZ RECORDINGS" or "XYZ RECORDS" or "XYZ MUSIC RELEASES LTD." or whatever.
 
 ![App Screenshot](/screenshot.png)
+
+
 
 ## Features
 - Create chronological playlists by record label
